@@ -8,7 +8,7 @@ Claude Code の活用事例・Tips・ニュースを毎朝自動収集し、Note
 ┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │  GitHub      │     │  collect_tips.py │     │   tips/         │
 │  Actions     │────>│                  │────>│   2026-03-04.md │
-│  (毎朝5時)   │     │  6つの無料APIから  │     │   2026-03-05.md │
+│  (毎朝5時)   │     │  8つの無料APIから  │     │   2026-03-05.md │
 └─────────────┘     │  情報を自動収集    │     │   ...           │
                     └──────────────────┘     └────────┬────────┘
                                                       │
@@ -28,6 +28,8 @@ Claude Code の活用事例・Tips・ニュースを毎朝自動収集し、Note
 | Hacker News | Claude Code に関する議論 |
 | Reddit | r/ClaudeAI, r/LocalLLaMA の投稿 |
 | DEV.to | Claude タグの技術記事 |
+| Qiita | 日本語の Claude Code 関連技術記事 |
+| Zenn | 日本語の Claude Code 関連技術記事 |
 | Anthropic Commits | claude-code リポジトリの最新コミット |
 
 ## セットアップ手順
@@ -106,6 +108,8 @@ query = urllib.parse.quote(f"claude code OR cursor in:name,description pushed:>{
 | Hacker News API | 無料 |
 | Reddit JSON API | 無料 |
 | DEV.to API | 無料 |
+| Qiita API | 無料 |
+| Zenn API | 無料 |
 | NotebookLM | 無料 |
 | **合計** | **¥0** |
 

@@ -63,13 +63,13 @@ def gh_headers():
 
 
 # ---------------------------------------------------------------------------
-# 収集関数 (6 つ)
+# 収集関数 (8 つ)
 # ---------------------------------------------------------------------------
 
 
 def collect_github_repos():
     """GitHub Search API でリポジトリを収集する。"""
-    print("[1/6] Collecting GitHub repos...")
+    print("[1/8] Collecting GitHub repos...")
     query = urllib.parse.quote(f"claude code in:name,description pushed:>{YESTERDAY_STR}")
     url = f"https://api.github.com/search/repositories?q={query}&sort=updated&per_page=10"
     data = fetch_json(url, headers=gh_headers())
@@ -91,7 +91,7 @@ def collect_github_repos():
 
 def collect_github_issues():
     """GitHub Search API で anthropics/claude-code の Issue を収集する。"""
-    print("[2/6] Collecting GitHub issues...")
+    print("[2/8] Collecting GitHub issues...")
     query = urllib.parse.quote(f"repo:anthropics/claude-code is:issue created:>{YESTERDAY_STR}")
     url = f"https://api.github.com/search/issues?q={query}&sort=created&per_page=10"
     data = fetch_json(url, headers=gh_headers())
@@ -116,7 +116,7 @@ def collect_github_issues():
 
 def collect_hackernews():
     """Hacker News Algolia API で関連ストーリーを収集する。"""
-    print("[3/6] Collecting Hacker News stories...")
+    print("[3/8] Collecting Hacker News stories...")
     keywords = ["claude code", "claude-code", "anthropic claude"]
     ts = int(YESTERDAY.timestamp())
     seen_titles = set()
@@ -152,7 +152,7 @@ def collect_hackernews():
 
 def collect_reddit():
     """Reddit JSON API で関連投稿を収集する。"""
-    print("[4/6] Collecting Reddit posts...")
+    print("[4/8] Collecting Reddit posts...")
     subreddits = ["ClaudeAI", "LocalLLaMA"]
     results = []
     for i, sub in enumerate(subreddits):
@@ -183,7 +183,7 @@ def collect_reddit():
 
 def collect_devto():
     """DEV.to API で Claude 関連記事を収集する。"""
-    print("[5/6] Collecting DEV.to articles...")
+    print("[5/8] Collecting DEV.to articles...")
     url = "https://dev.to/api/articles?tag=claude&per_page=10&top=1"
     data = fetch_json(url)
     if not data or not isinstance(data, list):
@@ -203,7 +203,7 @@ def collect_devto():
 
 def collect_anthropic_commits():
     """GitHub Commits API で anthropics/claude-code の最新コミットを収集する。"""
-    print("[6/6] Collecting Anthropic commits...")
+    print("[6/8] Collecting Anthropic commits...")
     url = (
         f"https://api.github.com/repos/anthropics/claude-code/commits"
         f"?since={YESTERDAY_STR}T00:00:00Z&per_page=10"
@@ -227,12 +227,81 @@ def collect_anthropic_commits():
     return results
 
 
+def collect_qiita():
+    """Qiita API で Claude Code 関連記事を収集する。"""
+    print("[7/8] Collecting Qiita articles...")
+    keywords = ["claude code", "claude-code"]
+    seen_urls = set()
+    results = []
+    for i, kw in enumerate(keywords):
+        if i > 0:
+            time.sleep(1)
+        query = urllib.parse.quote(kw)
+        url = (
+            f"https://qiita.com/api/v2/items?query={query}"
+            f"&per_page=10"
+        )
+        data = fetch_json(url)
+        if not data or not isinstance(data, list):
+            continue
+        for item in data:
+            item_url = item.get("url", "")
+            if item_url in seen_urls:
+                continue
+            # 日付フィルタ: created_at が YESTERDAY 以降のみ
+            created = (item.get("created_at", "") or "")[:10]
+            if created < YESTERDAY_STR:
+                continue
+            seen_urls.add(item_url)
+            tags = ", ".join(t.get("name", "") for t in item.get("tags", []))
+            results.append({
+                "source": "Qiita",
+                "title": item.get("title", ""),
+                "url": item_url,
+                "desc": truncate(item.get("body", "") or "", 200),
+                "tags": tags,
+                "likes": item.get("likes_count", 0),
+                "created": created,
+            })
+    print(f"  -> {len(results)} articles found")
+    return results
+
+
+def collect_zenn():
+    """Zenn API で Claude Code 関連記事を収集する。"""
+    print("[8/8] Collecting Zenn articles...")
+    url = "https://zenn.dev/api/articles?q=claude+code&order=latest"
+    data = fetch_json(url)
+    if not data or not isinstance(data, dict):
+        return []
+    articles = data.get("articles", [])
+    results = []
+    for item in articles[:10]:
+        slug = item.get("slug", "")
+        user_name = item.get("user", {}).get("username", "")
+        article_url = f"https://zenn.dev/{user_name}/articles/{slug}" if user_name and slug else ""
+        # 日付フィルタ: published_at が YESTERDAY 以降のみ
+        published = (item.get("published_at", "") or "")[:10]
+        if published < YESTERDAY_STR:
+            continue
+        results.append({
+            "source": "Zenn",
+            "title": item.get("title", ""),
+            "url": article_url,
+            "emoji": item.get("emoji", ""),
+            "likes": item.get("liked_count", 0),
+            "published": published,
+        })
+    print(f"  -> {len(results)} articles found")
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Markdown 生成
 # ---------------------------------------------------------------------------
 
 
-def build_markdown(repos, issues, hn, reddit, devto, commits):
+def build_markdown(repos, issues, hn, reddit, devto, commits, qiita, zenn):
     """収集結果を NotebookLM 用 Markdown に変換する。"""
     date_str = TODAY.strftime("%Y年%m月%d日")
     lines = []
@@ -341,6 +410,36 @@ def build_markdown(repos, issues, hn, reddit, devto, commits):
             lines.append("")
         total += len(devto)
 
+    # --- Qiita の技術記事 ---
+    if qiita:
+        sorted_qiita = sorted(qiita, key=lambda x: x.get("likes", 0), reverse=True)
+        lines.append("## Qiita の技術記事")
+        lines.append("")
+        lines.append("日本語の実践的な技術記事やノウハウが豊富です。")
+        lines.append("")
+        for q in sorted_qiita:
+            lines.append(f"### {q['title']}")
+            lines.append(f"- タグ: {q['tags']} / いいね: {q['likes']}")
+            lines.append(f"- 概要: {q['desc']}")
+            lines.append(f"- URL: {q['url']}")
+            lines.append("")
+        total += len(qiita)
+
+    # --- Zenn の技術記事 ---
+    if zenn:
+        sorted_zenn = sorted(zenn, key=lambda x: x.get("likes", 0), reverse=True)
+        lines.append("## Zenn の技術記事")
+        lines.append("")
+        lines.append("日本の開発者による深い技術解説や活用事例が見つかります。")
+        lines.append("")
+        for z in sorted_zenn:
+            emoji = z['emoji'] + " " if z.get('emoji') else ""
+            lines.append(f"### {emoji}{z['title']}")
+            lines.append(f"- いいね: {z['likes']} / 公開日: {z['published']}")
+            lines.append(f"- URL: {z['url']}")
+            lines.append("")
+        total += len(zenn)
+
     # --- 0 件の場合 ---
     if total == 0:
         lines.append("> 今日は新情報なし。明日をお楽しみに！")
@@ -385,10 +484,16 @@ def main():
     time.sleep(1)
 
     commits = collect_anthropic_commits()
+    time.sleep(1)
+
+    qiita = collect_qiita()
+    time.sleep(1)
+
+    zenn = collect_zenn()
 
     # Markdown 生成
     print("\nBuilding Markdown...")
-    md = build_markdown(repos, issues, hn, reddit, devto, commits)
+    md = build_markdown(repos, issues, hn, reddit, devto, commits, qiita, zenn)
 
     # ファイル出力
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -398,7 +503,7 @@ def main():
         f.write(md)
 
     print(f"\nOutput: {filepath}")
-    total = len(repos) + len(issues) + len(hn) + len(reddit) + len(devto) + len(commits)
+    total = len(repos) + len(issues) + len(hn) + len(reddit) + len(devto) + len(commits) + len(qiita) + len(zenn)
     print(f"Total items: {total}")
     print("Done!")
 
