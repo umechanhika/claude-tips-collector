@@ -39,7 +39,7 @@ claude-tips-collector/
 ### 要件
 
 - トリガー
-  - `schedule`: cron `0 20 * * *`（UTC 20:00 = JST 05:00、毎日実行）
+  - `schedule`: cron `0 20 * * *`（UTC 20:00 = JST 05:00、毎日実行）※現在はコメントアウトして定期実行を停止中
   - `workflow_dispatch`: 手動実行ボタンも用意する（テスト・デバッグ用）
 - 権限: `permissions: contents: write`（コミットとプッシュに必要）
 - タイムアウト: `timeout-minutes: 10`
